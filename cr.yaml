@@ -1,0 +1,7 @@
+apiVersion: clusterops.io/v1alpha1
+kind: EtcdBackup
+metadata:
+  name: cluster-etcd-backup
+  namespace: etcd-backup
+spec:
+  schedule: "*/2 * * * *"

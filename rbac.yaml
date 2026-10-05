@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: etcd-backup
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: etcd-backup-operator
+  namespace: etcd-backup
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: etcd-backup-operator
+rules:
+  # Our own resource: watch it, and patch status + Kopf annotations.
+  - apiGroups: ["clusterops.io"]
+    resources: ["etcdbackups"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["clusterops.io"]
+    resources: ["etcdbackups/status"]
+    verbs: ["get", "patch", "update"]
+
+  # Kopf resource discovery.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["list", "watch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list", "watch"]
+
+  # Kopf posts events about handler results.
+  - apiGroups: ["", "events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: etcd-backup-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: etcd-backup-operator
+subjects:
+  - kind: ServiceAccount
+    name: etcd-backup-operator
+    namespace: etcd-backup

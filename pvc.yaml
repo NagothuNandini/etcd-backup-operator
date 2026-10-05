@@ -1,0 +1,14 @@
+# Holds /backup: snapshots waiting for upload/delete and their .state files.
+# It must survive pod restarts or recovery has nothing to work with.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: etcd-backup
+  namespace: etcd-backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # storageClassName: <your-storage-class>
+  resources:
+    requests:
+      storage: 1Gi

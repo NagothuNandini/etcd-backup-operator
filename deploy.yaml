@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etcd-backup-operator
+  namespace: etcd-backup
+  labels:
+    app: etcd-backup-operator
+spec:
+  replicas: 1                 # keep at 1: the lock is in-process only
+  strategy:
+    type: Recreate            # RWO volume + single instance
+  selector:
+    matchLabels:
+      app: etcd-backup-operator
+  template:
+    metadata:
+      labels:
+        app: etcd-backup-operator
+    spec:
+
+      serviceAccountName: etcd-backup-operator
+
+      # Needed so 127.0.0.1:2379 reaches etcd on the control-plane node.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+
+      # Must run on a control-plane node (etcd + its certs live there).
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+
+      containers:
+        - name: operator
+          image: nandini951/etcd-backup-operator:2.0
+          imagePullPolicy: Always
+
+          # etcd client keys are root-only (0600) on kubeadm clusters.
+          securityContext:
+            runAsUser: 0
+
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+            # ---- Cloudian ----
+            - name: CLOUDIAN_ENDPOINT
+              value: "https://mycloudendpoint.com"
+            - name: CLOUDIAN_BUCKET
+              value: "etcdbackupbucket"
+            - name: CLOUDIAN_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cloudian-credentials
+                  key: CLOUDIAN_ACCESS_KEY
+            - name: CLOUDIAN_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cloudian-credentials
+                  key: CLOUDIAN_SECRET_KEY
+          volumeMounts:
+            - name: etcd-certs
+              mountPath: /etc/kubernetes/pki/etcd
+              readOnly: true
+            - name: backups
+              mountPath: /backup
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8085
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+      volumes:
+        - name: etcd-certs
+          hostPath:
+            path: /etc/kubernetes/pki/etcd
+            type: Directory
+        - name: backups
+          persistentVolumeClaim:
+            claimName: etcd-backup 
