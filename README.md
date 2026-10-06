@@ -1,6 +1,6 @@
 # etcd-backup-operator
 
-A Kubernetes operator (Python + [Kopf](https://kopf.readthedocs.io)) that takes scheduled **etcd snapshots**, uploads them to **Cloudian (S3-compatible) storage**, verifies the upload, and cleans up local files. It is crash-safe: interrupted backups are recovered automatically on the next run.
+A Kubernetes operator that takes scheduled **etcd snapshots**, uploads them to **Cloudian (S3-compatible) storage**, verifies the upload, and cleans up local files. It is crash-safe: interrupted backups are recovered automatically on the next run.
 
 ```
 EtcdBackup CR -> Operator -> etcdctl snapshot save -> /backup (PVC)
@@ -19,9 +19,8 @@ EtcdBackup CR -> Operator -> etcdctl snapshot save -> /backup (PVC)
 6. [Trigger and schedule backups](#6-trigger-and-schedule-backups)
 7. [Verify a backup reached Cloudian](#7-verify-a-backup-reached-cloudian)
 8. [How it works](#8-how-it-works)
-9. [Troubleshooting](#9-troubleshooting)
-10. [Uninstall](#10-uninstall)
-11. [Optional: build your own image](#11-optional-build-your-own-image)
+11. [Uninstall](#10-uninstall)
+12. [Optional: build your own image](#11-optional-build-your-own-image)
 
 ---
 
@@ -89,15 +88,6 @@ The Secret must be named **`cloudian-credentials`**, live in namespace **`etcd-b
 
 Either edit `secret.yaml`, or (recommended, so keys never land in Git) create it from the command line **after** step 1 below creates the namespace:
 
-```bash
-kubectl create secret generic cloudian-credentials \
-  --namespace etcd-backup \
-  --from-literal=CLOUDIAN_ACCESS_KEY='<your-access-key>' \
-  --from-literal=CLOUDIAN_SECRET_KEY='<your-secret-key>'
-```
-
-> If you use this command, **skip** `kubectl apply -f secret.yaml` in the deploy steps. Never commit real keys to Git.
-
 ### 3.3 Storage class: `pvc.yaml`
 
 If your cluster has no default StorageClass, uncomment and set:
@@ -106,7 +96,7 @@ If your cluster has no default StorageClass, uncomment and set:
 storageClassName: <your-storage-class>
 ```
 
-Adjust `storage: 1Gi` if needed. Snapshots are deleted after upload, but one snapshot plus any failed or pending snapshots must fit.
+Adjust `storage: if needed. Snapshots are deleted after upload, but one snapshot plus any failed or pending snapshots must fit.
 
 ### 3.4 Schedule: `cr.yaml`
 
@@ -294,46 +284,8 @@ UPLOAD_PENDING --(upload + verify OK)--> DELETE_PENDING --(local file deleted)--
 
 ---
 
-## 9. Troubleshooting
 
-| Symptom | Check / fix |
-|---|---|
-| Pod stuck `Pending` | `kubectl describe pod -n etcd-backup <pod>`. Check the PVC is bound and a control-plane node is available. |
-| Pod stuck `ImagePullBackOff` | Check the image name and registry access, or build and push your own image (section 11). |
-| Pod restarting repeatedly | See the liveness probe note below. |
-| `etcdctl failed` in logs | Verify cert paths and that `/etc/kubernetes/pki/etcd` exists on the node. Confirm etcd listens on `127.0.0.1:2379`. |
-| Upload keeps failing | Check endpoint URL, credentials, bucket permissions, and network reachability from the control-plane node. |
-| Phase `Failed` | Read the operator logs. It retries after 10 minutes (and pending uploads are retried every 5 minutes). |
-| Phase `InvalidSchedule` | Fix `spec.schedule` (5-field cron). |
-| `.db` and `.state` files remain in `/backup` | A backup is pending. Check logs, as recovery retries automatically. |
-| Files in `/backup/quarantine` | A state file was bad. Read the matching `.metadata` file for the reason. |
-
-**Liveness probe note:** `deploy.yaml` defines a liveness probe on `http://:8085/healthz`. Kopf only serves that endpoint if it is started with a liveness flag. The Dockerfile's default command is:
-
-```
-kopf run --standalone -Av /app/etcd-backup-operator.py
-```
-
-If the pod is restarted repeatedly by the probe, either remove the `livenessProbe` block from `deploy.yaml`, or add the flag to the container command, for example:
-
-```yaml
-command: ["kopf", "run", "--standalone", "-Av",
-          "--liveness=http://0.0.0.0:8085/healthz",
-          "/app/etcd-backup-operator.py"]
-```
-
-Useful commands:
-
-```bash
-kubectl describe pod -n etcd-backup -l app=etcd-backup-operator
-kubectl logs -n etcd-backup deploy/etcd-backup-operator --previous
-kubectl get events -n etcd-backup --sort-by=.lastTimestamp
-kubectl describe etcdbackup <name>
-```
-
----
-
-## 10. Uninstall
+## 9. Uninstall
 
 ```bash
 kubectl delete -f cr.yaml
@@ -348,7 +300,7 @@ kubectl delete -f rbac.yaml        # also deletes the etcd-backup namespace
 
 ---
 
-## 11. Optional: build your own image
+## 10. build your own image
 
 ```bash
 docker build -t <your-registry>/etcd-backup-operator:2.0 .
