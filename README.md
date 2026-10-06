@@ -47,7 +47,7 @@ EtcdBackup CR -> Operator -> etcdctl snapshot save -> /backup (PVC)
 - A **Cloudian / S3-compatible** endpoint, a bucket name, and an access key and secret key with permission to `HeadBucket`, `CreateBucket` (optional), `PutObject`, and `HeadObject`.
 - A StorageClass that can provision a `ReadWriteOnce` volume (or a default StorageClass).
 - Network access from the control-plane node to the Cloudian endpoint.
-- Access to pull the image `nandini951/etcd-backup-operator:2.0` (or your own build, see [section 11](#11-optional-build-your-own-image)).
+- Access to pull the image `nandini951/etcd-backup-operator:2.0` (or your own build)
 
 Quick checks:
 
